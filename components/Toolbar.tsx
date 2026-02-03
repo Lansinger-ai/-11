@@ -2,14 +2,20 @@
 import React from 'react';
 import { TOOLBAR_ACTIONS } from '../constants';
 import { Search } from 'lucide-react';
+import { ActionType } from '../types';
 
-export const Toolbar: React.FC = () => {
+interface ToolbarProps {
+  onAction: (type: ActionType) => void;
+}
+
+export const Toolbar: React.FC<ToolbarProps> = ({ onAction }) => {
   return (
     <div className="flex flex-wrap items-center justify-between px-2 py-1 bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm">
       <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
         {TOOLBAR_ACTIONS.map((action, idx) => (
           <button
             key={idx}
+            onClick={() => onAction(action.type)}
             className={`flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium border border-gray-200 rounded hover:bg-gray-50 transition-colors whitespace-nowrap active:bg-gray-100 ${action.color}`}
           >
             {action.icon}
