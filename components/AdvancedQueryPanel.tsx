@@ -79,6 +79,7 @@ export const AdvancedQueryPanel: React.FC<AdvancedQueryPanelProps> = ({ isOpen, 
     hostname: '',
     statuses: [],
     isGpuServer: '全部',
+    sources: [], // 新增
     arrivalBatches: [],
     arrivalBatchBulk: '',
     configTypes: [],
@@ -168,6 +169,14 @@ export const AdvancedQueryPanel: React.FC<AdvancedQueryPanelProps> = ({ isOpen, 
                   <option value="否">否</option>
                 </select>
               </div>
+
+              {/* 新增：来源多选 */}
+              <MultiSelect 
+                label="来源"
+                options={['使用权资产', '算力验收', '短租', '正常采购', '其他']}
+                selected={filters.sources}
+                onChange={val => setFilters({...filters, sources: val})}
+              />
 
               <MultiSelect 
                 label="到货批次 (下拉)"

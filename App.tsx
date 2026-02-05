@@ -48,6 +48,7 @@ const App: React.FC = () => {
       if (filters.hostname && !item.hostname.toLowerCase().includes(filters.hostname.toLowerCase())) return false;
       if (filters.statuses.length > 0 && !filters.statuses.includes(item.status)) return false;
       if (filters.isGpuServer !== '全部' && item.isGpuServer !== filters.isGpuServer) return false;
+      if (filters.sources.length > 0 && !filters.sources.includes(item.source)) return false; // 新增：来源过滤
       if (filters.arrivalBatches.length > 0 && !filters.arrivalBatches.includes(item.arrivalBatch)) return false;
       if (filters.configTypes.length > 0 && !filters.configTypes.includes(item.configType)) return false;
       if (filters.configSources.length > 0 && !filters.configSources.includes(item.configSource)) return false;

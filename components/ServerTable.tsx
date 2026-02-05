@@ -9,7 +9,8 @@ const COLUMNS = [
   { key: 'hostname', label: '主机名', width: 'w-32' },
   { key: 'status', label: '状态', width: 'w-24' },
   { key: 'isGpuServer', label: '是否GPU', width: 'w-24' },
-  { key: 'arrivalBatch', label: '到货批次', width: 'w-28' }, // 新增列
+  { key: 'source', label: '来源', width: 'w-28' }, // 新增：来源
+  { key: 'arrivalBatch', label: '到货批次', width: 'w-28' },
   { key: 'configType', label: '配置种类', width: 'w-28' },
   { key: 'cpu', modelKey: 'cpuModel', label: 'CPU (规格 / Model)', width: 'w-64' },
   { key: 'gpu', modelKey: 'gpuModel', label: 'GPU (规格 / Model)', width: 'w-64' },
@@ -115,7 +116,7 @@ export const ServerTable: React.FC<TableProps> = ({ data, highlightedSNs, onShow
 
   return (
     <div className="flex-1 overflow-auto bg-white table-container relative">
-      <table className="w-full border-collapse table-fixed text-[11px] leading-tight min-w-[2300px]">
+      <table className="w-full border-collapse table-fixed text-[11px] leading-tight min-w-[2400px]">
         <thead>
           <tr className="bg-gray-100 text-gray-700 uppercase tracking-wider font-semibold border-b border-gray-200 shadow-sm">
             <th className="w-10 px-2 py-3 border-r border-gray-200 sticky top-0 bg-gray-100 z-30 text-center">
@@ -189,6 +190,12 @@ export const ServerTable: React.FC<TableProps> = ({ data, highlightedSNs, onShow
                       ) : col.key === 'arrivalBatch' ? (
                         <div className="pt-1 text-gray-600 font-medium">
                           {String(value)}
+                        </div>
+                      ) : col.key === 'source' ? (
+                        <div className="pt-1">
+                          <span className="inline-block px-1.5 py-0.5 rounded-sm bg-gray-100 text-gray-600 border border-gray-200 font-medium text-[10px]">
+                            {String(value)}
+                          </span>
                         </div>
                       ) : col.key === 'configType' ? (
                         <div className="pt-1">

@@ -12,6 +12,8 @@ export interface LogEntry {
   timestamp: string;
 }
 
+export type AssetSource = '使用权资产' | '算力验收' | '短租' | '正常采购' | '其他';
+
 export interface ServerAsset {
   id: string;
   sn: string;
@@ -22,6 +24,7 @@ export interface ServerAsset {
   configType: '到货配置' | '改配配置';
   updatedAt: string;
   isGpuServer: '是' | '否';
+  source: AssetSource; // 新增：来源
   gpu: string;
   cpu: string;
   memory: string;
@@ -40,12 +43,13 @@ export interface ServerAsset {
 
 export interface FilterState {
   sn: string;
-  snBulk: string; // 新增：批量 SN 搜索
+  snBulk: string;
   hostname: string;
   statuses: string[];
   isGpuServer: string; // '全部' | '是' | '否'
+  sources: string[]; // 新增：来源多选
   arrivalBatches: string[];
-  arrivalBatchBulk: string; // 新增：批量到货批次搜索
+  arrivalBatchBulk: string;
   configTypes: string[];
   configSources: string[];
 }
