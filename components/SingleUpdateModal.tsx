@@ -50,18 +50,32 @@ const HARDWARE_CATALOG: Record<string, { specs: string[]; mapping: Record<string
       '3.84TB NVMe': ['Samsung-PM1733', 'Micron-7450-Pro'],
       '7.68TB NVMe': ['Samsung-PM1733-Max']
     }
+  },
+  fpga: {
+    specs: ['Xilinx Alveo U250', 'Xilinx Alveo U200'],
+    mapping: {
+      'Xilinx Alveo U250': ['U250-PQ123', 'U250-Custom'],
+      'Xilinx Alveo U200': ['U200-PQ456']
+    }
   }
 };
 
 const CATEGORIES = [
-  { id: 'cpu', label: 'CPU 控制器', icon: <Cpu size={14} /> },
-  { id: 'gpu', label: 'GPU 算力卡', icon: <Layout size={14} /> },
-  { id: 'memory', label: '内存模组', icon: <Settings2 size={14} /> },
-  { id: 'ssd', label: '固态硬盘', icon: <HardDrive size={14} /> },
-  { id: 'harddisk', label: '机械硬盘', icon: <HardDrive size={14} /> },
-  { id: 'networkCard', label: '网卡控制器', icon: <Layout size={14} /> },
-  { id: 'raid', label: 'RAID 阵列卡', icon: <Settings2 size={14} /> },
+  { id: 'gpu', label: 'GPU', icon: <Layout size={14} /> },
+  { id: 'cpu', label: 'CPU', icon: <Cpu size={14} /> },
+  { id: 'memory', label: '内存', icon: <Settings2 size={14} /> },
+  { id: 'networkCard', label: '网卡', icon: <Layout size={14} /> },
+  { id: 'harddisk', label: '硬盘', icon: <HardDrive size={14} /> },
+  { id: 'ssd', label: 'SSD', icon: <HardDrive size={14} /> },
+  { id: 'raid', label: 'RAID', icon: <Settings2 size={14} /> },
+  { id: 'fpga', label: 'FPGA', icon: <Cpu size={14} /> },
 ];
+
+const isAbnormalStr = (text: string): boolean => {
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  return lower.includes('err:') || lower.includes('unknown') || lower.includes('mismatch') || lower.includes('bad');
+};
 
 const parseToNested = (specStr: string, modelStr: string): SpecItem[] => {
   if (!specStr || specStr === '-') return [];
@@ -74,7 +88,6 @@ const parseToNested = (specStr: string, modelStr: string): SpecItem[] => {
     const specQty = parseInt(specMatch[2] || '1');
 
     const mPart = modelParts[idx] || '';
-    // Handle multi-model within a spec if they are separated by semicolon
     const mRows = mPart.split(';').map(m => m.trim()).filter(Boolean);
     
     const models: ModelItem[] = mRows.map(m => {
@@ -86,7 +99,6 @@ const parseToNested = (specStr: string, modelStr: string): SpecItem[] => {
       };
     });
 
-    // Default case if no models parsed
     if (models.length === 0) {
       models.push({ id: Math.random().toString(36).substr(2, 9), name: '', qty: specQty });
     }
@@ -106,7 +118,7 @@ export const SingleUpdateModal: React.FC<{
   server: ServerAsset | null;
   onSave: (sn: string, updates: Partial<ServerAsset>) => void;
 }> = ({ isOpen, onClose, server, onSave }) => {
-  const [activeTab, setActiveTab] = useState('cpu');
+  const [activeTab, setActiveTab] = useState('gpu');
   const [showConfirm, setShowConfirm] = useState(false);
   const [configs, setConfigs] = useState<Record<string, SpecItem[]>>({});
 
@@ -123,6 +135,16 @@ export const SingleUpdateModal: React.FC<{
   }, [server]);
 
   if (!isOpen || !server) return null;
+
+  const checkCategoryAbnormality = (catId: string): boolean => {
+    const specs = configs[catId] || [];
+    return specs.some(s => {
+      const nameAbnormal = isAbnormalStr(s.name);
+      const modelNameAbnormal = s.models.some(m => isAbnormalStr(m.name));
+      const qtyMismatch = s.models.reduce((sum, m) => sum + m.qty, 0) !== s.totalQty;
+      return nameAbnormal || modelNameAbnormal || qtyMismatch;
+    });
+  };
 
   const addSpec = (catId: string) => {
     const newSpec: SpecItem = {
@@ -206,15 +228,21 @@ export const SingleUpdateModal: React.FC<{
   };
 
   const handleImport = () => {
-    // Mocking an import logic for current tab
+    // Simulated file import behavior with some "errors" for testing visual feedback
     if (activeTab === 'cpu') {
       const imported: SpecItem[] = [{
         id: 'imp-1', name: 'Intel Xeon Platinum 8480C', totalQty: 2,
-        models: [{ id: 'imp-m1', name: 'Intel-8480C-Retail-V1', qty: 2 }]
+        models: [{ id: 'imp-m1', name: 'ERR: Unknown Rev', qty: 2 }]
       }];
       setConfigs(prev => ({ ...prev, cpu: imported }));
+    } else if (activeTab === 'gpu') {
+        const imported: SpecItem[] = [{
+            id: 'imp-2', name: 'NVIDIA H100 80GB', totalQty: 8,
+            models: [{ id: 'imp-m2', name: 'H100-PG520-S01', qty: 8 }]
+        }];
+        setConfigs(prev => ({ ...prev, gpu: imported }));
     } else {
-      alert('该配件分类暂无推荐模版');
+      alert('请上传配置文件');
     }
   };
 
@@ -243,7 +271,7 @@ export const SingleUpdateModal: React.FC<{
         {/* Global Action Bar */}
         <div className="px-8 py-3.5 bg-white border-b border-slate-50 flex gap-4 items-center">
           <button onClick={handleImport} className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-xl border border-blue-100 text-[11px] font-bold hover:bg-blue-100 transition-all active:scale-95">
-            <Upload size={14} /> 导入推荐配置
+            <Upload size={14} /> 导入配置文件
           </button>
           <button onClick={handleClear} className="flex items-center gap-2 px-4 py-2 bg-rose-50 text-rose-600 rounded-xl border border-rose-100 text-[11px] font-bold hover:bg-rose-100 transition-all active:scale-95">
             <Trash2 size={14} /> 清空所有项
@@ -266,27 +294,41 @@ export const SingleUpdateModal: React.FC<{
           {/* Sidebar */}
           <div className="w-56 bg-slate-50/80 border-r border-slate-100 p-4 space-y-1 overflow-y-auto">
             <p className="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">配件分类</p>
-            {CATEGORIES.map(cat => (
-              <button
-                key={cat.id}
-                onClick={() => setActiveTab(cat.id)}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-[11px] font-bold transition-all ${
-                  activeTab === cat.id 
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' 
-                    : 'text-slate-500 hover:bg-slate-200/50 hover:text-slate-700'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  {cat.icon}
-                  {cat.label}
-                </div>
-                {(configs[cat.id]?.length || 0) > 0 && (
-                  <span className={`px-1.5 py-0.5 rounded-full text-[9px] ${activeTab === cat.id ? 'bg-white text-indigo-600' : 'bg-slate-200 text-slate-600'}`}>
-                    {configs[cat.id].length}
-                  </span>
-                )}
-              </button>
-            ))}
+            {CATEGORIES.map(cat => {
+              const hasAbnormality = checkCategoryAbnormality(cat.id);
+              const isActive = activeTab === cat.id;
+
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setActiveTab(cat.id)}
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-[11px] font-bold transition-all relative group ${
+                    isActive 
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' 
+                      : hasAbnormality 
+                        ? 'bg-rose-50 text-rose-600 border border-rose-200'
+                        : 'text-slate-500 hover:bg-slate-200/50 hover:text-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={hasAbnormality && !isActive ? 'animate-pulse' : ''}>
+                       {cat.icon}
+                    </div>
+                    {cat.label}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {hasAbnormality && !isActive && (
+                      <AlertTriangle size={12} className="text-rose-500" />
+                    )}
+                    {(configs[cat.id]?.length || 0) > 0 && (
+                      <span className={`px-1.5 py-0.5 rounded-full text-[9px] ${isActive ? 'bg-white text-indigo-600' : hasAbnormality ? 'bg-rose-200 text-rose-700' : 'bg-slate-200 text-slate-600'}`}>
+                        {configs[cat.id].length}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
           {/* Main Area */}
@@ -312,11 +354,12 @@ export const SingleUpdateModal: React.FC<{
                 const validModels = (catalog && catalog.mapping[spec.name]) || [];
                 const currentModelQtySum = spec.models.reduce((sum, m) => sum + m.qty, 0);
                 const isMismatch = currentModelQtySum !== spec.totalQty;
+                const isSpecAbnormal = isAbnormalStr(spec.name);
 
                 return (
-                  <div key={spec.id} className="group bg-white border border-slate-200 rounded-[2rem] overflow-hidden transition-all hover:border-indigo-200 hover:shadow-xl hover:shadow-slate-100">
+                  <div key={spec.id} className={`group bg-white border rounded-[2rem] overflow-hidden transition-all hover:shadow-xl hover:shadow-slate-100 ${isMismatch || isSpecAbnormal ? 'border-rose-200' : 'border-slate-200 hover:border-indigo-200'}`}>
                     {/* Spec Header */}
-                    <div className="bg-slate-50/80 px-8 py-5 flex items-center gap-6 border-b border-slate-100">
+                    <div className={`px-8 py-5 flex items-center gap-6 border-b ${isMismatch || isSpecAbnormal ? 'bg-rose-50/50 border-rose-100' : 'bg-slate-50/80 border-slate-100'}`}>
                       <div className="flex-1 flex gap-4 items-center">
                         <div className="flex flex-col flex-1 gap-1">
                           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">规格名称 (Spec)</label>
@@ -325,7 +368,7 @@ export const SingleUpdateModal: React.FC<{
                               <select 
                                 value={spec.name}
                                 onChange={e => updateSpec(activeTab, spec.id, { name: e.target.value })}
-                                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
+                                className={`w-full border rounded-xl px-4 py-2 text-xs font-bold outline-none appearance-none ${isSpecAbnormal ? 'bg-rose-50 border-rose-300 text-rose-700 focus:ring-rose-500' : 'bg-white border-slate-200 focus:ring-indigo-500'}`}
                               >
                                 <option value="" disabled>选择或输入规格...</option>
                                 {catalog.specs.map(s => <option key={s} value={s}>{s}</option>)}
@@ -336,7 +379,7 @@ export const SingleUpdateModal: React.FC<{
                                 type="text" 
                                 value={spec.name}
                                 onChange={e => updateSpec(activeTab, spec.id, { name: e.target.value })}
-                                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                                className={`w-full border rounded-xl px-4 py-2 text-xs font-bold outline-none ${isSpecAbnormal ? 'bg-rose-50 border-rose-300 text-rose-700 focus:ring-rose-500' : 'bg-white border-slate-200 focus:ring-indigo-500'}`}
                                 placeholder="输入硬件规格..."
                               />
                             )}
@@ -344,13 +387,13 @@ export const SingleUpdateModal: React.FC<{
                         </div>
                         <div className="w-28 flex flex-col gap-1">
                           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">总数量</label>
-                          <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl px-3 py-2">
+                          <div className={`flex items-center gap-1 border rounded-xl px-3 py-2 ${isMismatch ? 'bg-rose-50 border-rose-300' : 'bg-white border-slate-200'}`}>
                             <span className="text-[10px] font-bold text-slate-400">x</span>
                             <input 
                               type="number" 
                               value={spec.totalQty}
                               onChange={e => updateSpec(activeTab, spec.id, { totalQty: parseInt(e.target.value) || 0 })}
-                              className="w-full text-xs font-bold outline-none"
+                              className="w-full text-xs font-bold outline-none bg-transparent"
                             />
                           </div>
                         </div>
@@ -366,7 +409,7 @@ export const SingleUpdateModal: React.FC<{
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] font-bold text-slate-500 uppercase">Model 映射详情</span>
                           {isMismatch && (
-                            <span className="text-[9px] font-bold text-amber-500 flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100 animate-pulse">
+                            <span className="text-[9px] font-bold text-rose-600 flex items-center gap-1 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100 animate-pulse">
                               <AlertTriangle size={10} /> 数量不匹配 (当前: {currentModelQtySum})
                             </span>
                           )}
@@ -380,51 +423,54 @@ export const SingleUpdateModal: React.FC<{
                       </div>
 
                       <div className="grid grid-cols-1 gap-3">
-                        {spec.models.map((model, mIdx) => (
-                          <div key={model.id} className="flex items-center gap-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-100 group/model">
-                            <div className="w-6 h-6 bg-white border border-slate-200 rounded-full flex items-center justify-center text-[10px] font-bold text-slate-400 shrink-0">
-                              {mIdx + 1}
-                            </div>
-                            <div className="flex-1 relative">
-                              {validModels.length > 0 ? (
-                                <select 
-                                  value={model.name}
-                                  onChange={e => updateModel(activeTab, spec.id, model.id, { name: e.target.value })}
-                                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold font-mono outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
-                                >
-                                  <option value="" disabled>选择 Model 号...</option>
-                                  {validModels.map(m => <option key={m} value={m}>{m}</option>)}
-                                  {model.name && !validModels.includes(model.name) && <option value={model.name}>{model.name}</option>}
-                                </select>
-                              ) : (
-                                <input 
-                                  type="text" 
-                                  value={model.name}
-                                  onChange={e => updateModel(activeTab, spec.id, model.id, { name: e.target.value })}
-                                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold font-mono outline-none focus:ring-2 focus:ring-indigo-500"
-                                  placeholder="输入 Model 编号..."
-                                />
-                              )}
-                              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />
-                            </div>
-                            <div className="w-24">
-                              <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl px-3 py-2">
-                                <span className="text-[10px] font-bold text-slate-400">x</span>
-                                <input 
-                                  type="number" 
-                                  value={model.qty}
-                                  onChange={e => updateModel(activeTab, spec.id, model.id, { qty: parseInt(e.target.value) || 0 })}
-                                  className="w-full text-xs font-bold outline-none"
-                                />
+                        {spec.models.map((model, mIdx) => {
+                          const isMAbnormal = isAbnormalStr(model.name);
+                          return (
+                            <div key={model.id} className={`flex items-center gap-4 p-4 rounded-2xl border group/model ${isMAbnormal ? 'bg-rose-50/30 border-rose-200' : 'bg-slate-50/50 border-slate-100'}`}>
+                              <div className={`w-6 h-6 border rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${isMAbnormal ? 'bg-white border-rose-300 text-rose-400' : 'bg-white border-slate-200 text-slate-400'}`}>
+                                {mIdx + 1}
                               </div>
+                              <div className="flex-1 relative">
+                                {validModels.length > 0 ? (
+                                  <select 
+                                    value={model.name}
+                                    onChange={e => updateModel(activeTab, spec.id, model.id, { name: e.target.value })}
+                                    className={`w-full border rounded-xl px-4 py-2 text-xs font-bold font-mono outline-none appearance-none ${isMAbnormal ? 'bg-white border-rose-300 text-rose-700 focus:ring-rose-500' : 'bg-white border-slate-200 focus:ring-indigo-500'}`}
+                                  >
+                                    <option value="" disabled>选择 Model 号...</option>
+                                    {validModels.map(m => <option key={m} value={m}>{m}</option>)}
+                                    {model.name && !validModels.includes(model.name) && <option value={model.name}>{model.name}</option>}
+                                  </select>
+                                ) : (
+                                  <input 
+                                    type="text" 
+                                    value={model.name}
+                                    onChange={e => updateModel(activeTab, spec.id, model.id, { name: e.target.value })}
+                                    className={`w-full border rounded-xl px-4 py-2 text-xs font-bold font-mono outline-none ${isMAbnormal ? 'bg-white border-rose-300 text-rose-700 focus:ring-rose-500' : 'bg-white border-slate-200 focus:ring-indigo-500'}`}
+                                    placeholder="输入 Model 编号..."
+                                  />
+                                )}
+                                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />
+                              </div>
+                              <div className="w-24">
+                                <div className={`flex items-center gap-1 border rounded-xl px-3 py-2 ${isMismatch ? 'bg-white border-rose-300' : 'bg-white border-slate-200'}`}>
+                                  <span className="text-[10px] font-bold text-slate-400">x</span>
+                                  <input 
+                                    type="number" 
+                                    value={model.qty}
+                                    onChange={e => updateModel(activeTab, spec.id, model.id, { qty: parseInt(e.target.value) || 0 })}
+                                    className="w-full text-xs font-bold outline-none bg-transparent"
+                                  />
+                                </div>
+                              </div>
+                              {spec.models.length > 1 && (
+                                <button onClick={() => removeModel(activeTab, spec.id, model.id)} className="p-2 text-slate-300 hover:text-rose-400 transition-colors">
+                                  <Trash size={14} />
+                                </button>
+                              )}
                             </div>
-                            {spec.models.length > 1 && (
-                              <button onClick={() => removeModel(activeTab, spec.id, model.id)} className="p-2 text-slate-300 hover:text-rose-400 transition-colors">
-                                <Trash size={14} />
-                              </button>
-                            )}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
@@ -449,7 +495,7 @@ export const SingleUpdateModal: React.FC<{
             <AlertTriangle size={16} className="text-amber-500" />
             <p className="text-[10px] font-medium leading-relaxed uppercase tracking-tight">
               保存将立即更新该资产硬件快照。 <span className="text-slate-600 font-bold">SN: {server.sn}</span><br/>
-              如果规格与 Model 数量不匹配，表格中将显示异常警示。
+              如果规格与 Model 数量不匹配，或数据识别包含异常关键字，表格及侧边栏将显示红警。
             </p>
           </div>
           <div className="flex gap-4">

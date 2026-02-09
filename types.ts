@@ -32,6 +32,7 @@ export interface ServerAsset {
   harddisk: string;
   ssd: string;
   raid: string;
+  fpga: string;
   gpuModel: string;
   cpuModel: string;
   memoryModel: string;
@@ -39,6 +40,8 @@ export interface ServerAsset {
   harddiskModel: string;
   ssdModel: string;
   raidModel: string;
+  fpgaModel: string;
+  attachments?: string[]; // 新增：附件列表
 }
 
 export interface FilterState {

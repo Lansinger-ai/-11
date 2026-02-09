@@ -148,6 +148,7 @@ const App: React.FC = () => {
           ...item,
           ...cfg.specs,
           ...cfg.models,
+          attachments: cfg.sourceFiles, // 保存导入时的源文件作为附件
           configSource: '改配' as const,
           configType: '改配配置' as const,
           updatedAt: now

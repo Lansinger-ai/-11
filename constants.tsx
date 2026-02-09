@@ -53,6 +53,10 @@ export const MOCK_DATA: ServerAsset[] = Array.from({ length: 50 }, (_, i) => {
     
     raid: 'RAID 1 | RAID 10',
     raidModel: '9460-16i-Primary | 9460-16i-Secondary',
+
+    fpga: '-',
+    fpgaModel: '-',
+    attachments: i % 7 === 0 ? ['pxe_capture_log.txt', 'hardware_inventory.csv'] : (i % 3 === 0 ? ['import_spec.json'] : []),
   };
 });
 

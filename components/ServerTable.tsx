@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, AlertTriangle, FileText, Settings2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, FileText, Settings2, Paperclip } from 'lucide-react';
 import { ServerAsset } from '../types';
 
 const COLUMNS = [
@@ -19,7 +19,9 @@ const COLUMNS = [
   { key: 'harddisk', modelKey: 'harddiskModel', label: '硬盘 (规格 / Model)', width: 'w-56' },
   { key: 'ssd', modelKey: 'ssdModel', label: 'SSD (规格 / Model)', width: 'w-56' },
   { key: 'raid', modelKey: 'raidModel', label: 'RAID (规格 / Model)', width: 'w-48' },
+  { key: 'fpga', modelKey: 'fpgaModel', label: 'FPGA (规格 / Model)', width: 'w-48' },
   { key: 'configSource', label: '配置来源', width: 'w-24' },
+  { key: 'attachments', label: '附件', width: 'w-40' }, // 新增：附件列
   { key: 'updatedAt', label: '更新时间', width: 'w-36' },
   { key: 'actions', label: '操作', width: 'w-32' },
 ];
@@ -31,7 +33,7 @@ const isAbnormalString = (model: string): boolean => {
 
 const checkRowAbnormality = (row: ServerAsset): boolean => {
   const modelKeys: (keyof ServerAsset)[] = [
-    'cpuModel', 'gpuModel', 'memoryModel', 'networkCardModel', 'harddiskModel', 'ssdModel', 'raidModel'
+    'cpuModel', 'gpuModel', 'memoryModel', 'networkCardModel', 'harddiskModel', 'ssdModel', 'raidModel', 'fpgaModel'
   ];
   return modelKeys.some(key => isAbnormalString(String(row[key])));
 };
@@ -220,6 +222,19 @@ export const ServerTable: React.FC<TableProps> = ({ data, highlightedSNs, onShow
                           }`}>
                             {row.configSource}
                           </span>
+                        </div>
+                      ) : col.key === 'attachments' ? (
+                        <div className="flex flex-col gap-1 pt-1 overflow-hidden">
+                          {row.attachments && row.attachments.length > 0 ? (
+                            row.attachments.map((file, fIdx) => (
+                              <div key={fIdx} className="flex items-center gap-1.5 px-2 py-0.5 bg-indigo-50 border border-indigo-100 rounded-sm group/file hover:bg-indigo-100 transition-colors cursor-pointer max-w-full">
+                                <Paperclip size={10} className="text-indigo-400 shrink-0" />
+                                <span className="text-[10px] text-indigo-700 font-medium truncate" title={file}>{file}</span>
+                              </div>
+                            ))
+                          ) : (
+                            <span className="text-gray-300 px-2 italic text-[10px]">无附件</span>
+                          )}
                         </div>
                       ) : col.key === 'updatedAt' ? (
                         <div className="pt-1 font-mono text-gray-500 whitespace-nowrap">
