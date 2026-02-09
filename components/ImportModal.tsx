@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useMemo } from 'react';
-import { X, Upload, FileText, CheckCircle, AlertTriangle, ChevronRight, Save, ChevronDown, ListFilter, Cpu, HardDrive, Layout, Server, FileUp, ArrowRight, Layers, Settings2, Database, Search, Hash, PlusCircle, AlertCircle, Activity, ExternalLink } from 'lucide-react';
+import { X, Upload, FileText, CheckCircle, AlertTriangle, ChevronRight, Save, ChevronDown, ListFilter, Cpu, HardDrive, Layout, Server, FileUp, ArrowRight, Layers, Settings2, Database, Search, Hash, PlusCircle, AlertCircle, Activity, ExternalLink, Factory, FileArchive, Check, RotateCcw } from 'lucide-react';
 
 export interface ParsedConfig {
   id: string;
@@ -24,6 +24,18 @@ interface SummaryCategory {
   }[];
 }
 
+const MANUFACTURERS = [
+  '浪潮 (Inspur)',
+  '戴尔 (Dell)',
+  '惠普 (HPE)',
+  '联想 (Lenovo)',
+  '华为 (Huawei)',
+  '超微 (Supermicro)',
+  '中兴 (ZTE)',
+  '新华三 (H3C)',
+  '超聚变 (FusionServer)'
+];
+
 const ENUM_OPTIONS: Record<string, { specs: string[]; models: string[] }> = {
   gpu: {
     specs: ['NVIDIA A100 80GB x8', 'NVIDIA H100 80GB x8', 'NVIDIA L40S x4'],
@@ -35,7 +47,7 @@ const ENUM_OPTIONS: Record<string, { specs: string[]; models: string[] }> = {
   },
   memory: {
     specs: ['256GB (32GB x8)', '1024GB (64GB x16)', '2048GB (128GB x16)'],
-    models: ['Samsung-DDR4-3200 x8', 'Hynix-DDR5-4800 x16', 'Samsung-DDR5-4800 x16']
+    models: ['Samsung-DDR4-3200 x8', 'Hynix-DDR4-3200 x8', 'Samsung-DDR4-3200 x8']
   },
   networkCard: {
     specs: ['100G Dual Port x1', '25G Quad Port x1', '200G HDR x1'],
@@ -129,6 +141,8 @@ const EditableCell: React.FC<{
 export const ImportModal: React.FC<{ isOpen: boolean; onClose: () => void; onApply: (configs: any[]) => void }> = ({ isOpen, onClose, onApply }) => {
   const [step, setStep] = useState(1);
   const [isParsing, setIsParsing] = useState(false);
+  const [hasUploaded, setHasUploaded] = useState(false);
+  const [selectedManufacturer, setSelectedManufacturer] = useState<string>('');
   const [parsedConfigs, setParsedConfigs] = useState<ParsedConfig[]>([]);
   const [selectedConfigIds, setSelectedConfigIds] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -136,12 +150,30 @@ export const ImportModal: React.FC<{ isOpen: boolean; onClose: () => void; onApp
   const [currentActiveConfigId, setCurrentActiveConfigId] = useState<string | null>(null);
   const [detailCategory, setDetailCategory] = useState<SummaryCategory | null>(null);
 
+  const allDetectedSNs = useMemo(() => {
+    return parsedConfigs.reduce((acc, curr) => [...acc, ...curr.suggestedSNs], [] as string[]);
+  }, [parsedConfigs]);
+
   const selectedConfigs = useMemo(() => {
-    return parsedConfigs.filter(c => selectedConfigIds.has(c.id)).map(c => ({
-      ...c,
-      targetSNs: [...new Set([...c.suggestedSNs, ...c.additionalSNs])]
-    }));
-  }, [parsedConfigs, selectedConfigIds]);
+    return parsedConfigs.filter(c => selectedConfigIds.has(c.id)).map(c => {
+      // 在应用时，将厂商信息前置到所有规格描述中
+      const updatedSpecs: Record<string, string> = {};
+      Object.entries(c.specs).forEach(([key, value]) => {
+        // Fix: Cast 'value' to string to access 'startsWith'
+        const val = value as string;
+        if (val !== '-' && !val.startsWith(selectedManufacturer)) {
+          updatedSpecs[key] = `${selectedManufacturer} ${val}`;
+        } else {
+          updatedSpecs[key] = val;
+        }
+      });
+      return {
+        ...c,
+        specs: updatedSpecs,
+        targetSNs: [...new Set([...c.suggestedSNs, ...c.additionalSNs])]
+      };
+    });
+  }, [parsedConfigs, selectedConfigIds, selectedManufacturer]);
 
   const unmappedSummary = useMemo<Record<string, SummaryCategory>>(() => {
     const summary: Record<string, SummaryCategory> = {};
@@ -180,7 +212,6 @@ export const ImportModal: React.FC<{ isOpen: boolean; onClose: () => void; onApp
   const enhancedSummary = useMemo<Record<string, SummaryCategory>>(() => {
     const s: Record<string, SummaryCategory> = { ...unmappedSummary };
     if (s['memory'] && s['memory'].issues.length > 0) {
-      // Fake dozens of memory issues as requested to demonstrate handling large volumes
       for(let i=1; i<=35; i++) {
         s['memory'].issues.push({
           rawId: `UNKNOWN_MEM_CHIP_00${i}_REVISION_A`,
@@ -194,14 +225,19 @@ export const ImportModal: React.FC<{ isOpen: boolean; onClose: () => void; onApp
 
   if (!isOpen) return null;
 
-  const handleFileUpload = () => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
     setIsParsing(true);
+    
     setTimeout(() => {
       const allSNs = Array.from({ length: 100 }, (_, i) => `SN-IMPORT-${2000 + i}`);
       
       const configA: ParsedConfig = {
         id: 'TEMPLATE-H100-NODE-60',
-        sourceFiles: ['h100_cluster_log.zip'],
+        // Fix: Cast array elements to any or File to access 'name'
+        sourceFiles: Array.from(files).map((f: any) => f.name),
         suggestedSNs: allSNs.slice(0, 60),
         additionalSNs: [],
         rawIds: { gpu: 'NV-ID-H100-SXM5-80GB', cpu: 'GenuineIntel-Family-6-Model-143', memory: 'PN: M393A8G40BB2-CT7', networkCard: 'PCI-15B3-1021', harddisk: 'ST4000NM002', ssd: 'MZ-PLJ3T20', raid: '9460-16i-Primary', fpga: '-' },
@@ -212,7 +248,8 @@ export const ImportModal: React.FC<{ isOpen: boolean; onClose: () => void; onApp
 
       const configB: ParsedConfig = {
         id: 'TEMPLATE-A100-MISMATCH-40',
-        sourceFiles: ['mixed_node_capture.txt'],
+        // Fix: Cast array elements to any or File to access 'name'
+        sourceFiles: Array.from(files).map((f: any) => f.name),
         suggestedSNs: allSNs.slice(60, 100),
         additionalSNs: [],
         rawIds: { gpu: 'NV-ID-A100-SXM4', cpu: 'GenuineIntel-Family-6-Model-106', memory: 'UNKNOWN-MEM-SERIES-X', networkCard: 'PCI-15B3-1017', harddisk: 'UNKNOWN_PART_HDD_X1', ssd: 'MZ-76E1T0', raid: 'MegaRAID-SAS-9361', fpga: 'ALVEO-U250-PQ' },
@@ -224,7 +261,7 @@ export const ImportModal: React.FC<{ isOpen: boolean; onClose: () => void; onApp
       setParsedConfigs([configA, configB]);
       setSelectedConfigIds(new Set([configA.id, configB.id]));
       setIsParsing(false);
-      setStep(2);
+      setHasUploaded(true);
     }, 1200);
   };
 
@@ -326,7 +363,7 @@ export const ImportModal: React.FC<{ isOpen: boolean; onClose: () => void; onApp
         {/* Steps Navigation */}
         <div className="flex bg-white px-16 py-6 border-b border-gray-50 shadow-sm justify-between">
           {[
-            { n: 1, l: '源文件解析' },
+            { n: 1, l: '解析源文件与指定厂商' },
             { n: 2, l: '规格映射与数量核对' },
             { n: 3, l: '批量资产应用' }
           ].map((s, i) => (
@@ -343,26 +380,98 @@ export const ImportModal: React.FC<{ isOpen: boolean; onClose: () => void; onApp
         {/* Main Content Area */}
         <div className="flex-1 overflow-auto p-12 bg-slate-50/20 custom-scrollbar min-h-[550px]">
           {step === 1 && (
-            <div className="h-full flex flex-col items-center justify-center">
+            <div className="h-full flex flex-col items-center justify-start gap-10">
               {isParsing ? (
-                <div className="text-center animate-pulse">
+                <div className="text-center animate-pulse mt-32">
                   <div className="w-20 h-20 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-8" />
-                  <p className="text-base font-bold text-gray-600 tracking-tight italic">正在扫描 100 台服务器节点配置快照，聚合特征模板...</p>
+                  <p className="text-base font-bold text-gray-600 tracking-tight italic">正在扫描上传的文件配置快照，聚合资产 SN...</p>
+                </div>
+              ) : !hasUploaded ? (
+                <div className="w-full max-w-3xl flex flex-col items-center justify-center animate-in fade-in slide-in-from-bottom-4 duration-500 mt-20">
+                    <div 
+                      className="w-full p-24 border-2 border-dashed border-indigo-200 rounded-[4rem] bg-white flex flex-col items-center hover:border-indigo-400 hover:bg-indigo-50/30 transition-all cursor-pointer group shadow-xl shadow-indigo-100/20"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <div className="w-24 h-24 bg-indigo-50 text-indigo-500 rounded-[2.5rem] flex items-center justify-center mb-8 group-hover:scale-110 transition-transform">
+                        <FileArchive size={48} />
+                      </div>
+                      <h4 className="text-2xl font-black text-slate-800">上传抓取脚本日志或压缩包</h4>
+                      <p className="text-sm text-slate-400 mt-4 text-center leading-relaxed">
+                        支持一次性上传多个节点的离线抓取文件。<br/>
+                        系统将自动识别 <span className="font-bold text-slate-600">Serial Number</span> 并归纳同类配置。
+                      </p>
+                      <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" multiple />
+                    </div>
                 </div>
               ) : (
-                <div 
-                  className="w-full max-w-3xl p-24 border-2 border-dashed border-gray-200 rounded-[4rem] bg-white flex flex-col items-center hover:border-indigo-400 hover:bg-indigo-50/30 transition-all cursor-pointer group shadow-sm"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <div className="w-24 h-24 bg-indigo-50 text-indigo-500 rounded-[2.5rem] flex items-center justify-center mb-8 group-hover:scale-110 transition-transform">
-                    <FileUp size={48} />
+                <div className="w-full max-w-5xl space-y-10 animate-in fade-in zoom-in-95 duration-400">
+                  {/* Parsing Results Summary */}
+                  <div className="bg-white border border-gray-200 rounded-[3rem] p-10 shadow-xl shadow-indigo-100/10 flex flex-col gap-8">
+                     <div className="flex items-center justify-between border-b border-slate-50 pb-6">
+                        <div className="flex items-center gap-4">
+                           <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
+                             <Check size={24} />
+                           </div>
+                           <div>
+                             <h4 className="text-lg font-black text-slate-800 tracking-tight">源文件解析完成</h4>
+                             <p className="text-[12px] text-slate-400 font-medium">成功从 {parsedConfigs.reduce((acc, c) => acc + c.sourceFiles.length, 0)} 个文件中提取到资产数据</p>
+                           </div>
+                        </div>
+                        <button 
+                          onClick={() => { setHasUploaded(false); setParsedConfigs([]); setSelectedManufacturer(''); }}
+                          className="text-[11px] font-bold text-slate-400 hover:text-rose-600 transition-colors flex items-center gap-1.5"
+                        >
+                          <RotateCcw size={12} /> 重新上传
+                        </button>
+                     </div>
+
+                     <div className="grid grid-cols-12 gap-10">
+                        {/* SN Tag Cloud */}
+                        <div className="col-span-5 space-y-4">
+                           <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">发现的资产 SN ({allDetectedSNs.length})</span>
+                           </div>
+                           <div className="w-full h-44 p-4 bg-slate-50 border border-slate-100 rounded-[2rem] overflow-y-auto custom-scrollbar-thin flex flex-wrap gap-2 content-start">
+                              {allDetectedSNs.map(sn => (
+                                <div key={sn} className="px-3 py-1 bg-white border border-slate-200 text-[10px] font-mono font-bold text-slate-500 rounded-lg shadow-sm">
+                                  {sn}
+                                </div>
+                              ))}
+                           </div>
+                        </div>
+
+                        {/* Manufacturer Selection Grid */}
+                        <div className="col-span-7 space-y-4">
+                           <div className="flex items-center gap-3">
+                              <Factory size={16} className="text-indigo-600" />
+                              <span className="text-[11px] font-black text-slate-700 uppercase tracking-widest">请选择这批资产的服务器厂商 (必选)</span>
+                           </div>
+                           <div className="grid grid-cols-3 gap-3">
+                              {MANUFACTURERS.map(brand => (
+                                <button
+                                  key={brand}
+                                  onClick={() => setSelectedManufacturer(brand)}
+                                  className={`flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl border-2 font-bold text-[12px] transition-all duration-200 ${
+                                    selectedManufacturer === brand 
+                                      ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-100 scale-102' 
+                                      : 'bg-white border-slate-100 text-slate-500 hover:border-indigo-100 hover:text-indigo-600'
+                                  }`}
+                                >
+                                  {brand}
+                                  {selectedManufacturer === brand && <Check size={14} className="animate-in zoom-in" />}
+                                </button>
+                              ))}
+                           </div>
+                        </div>
+                     </div>
                   </div>
-                  <h4 className="text-2xl font-bold text-gray-800">上传抓取脚本日志</h4>
-                  <p className="text-sm text-gray-400 mt-4 text-center leading-relaxed">
-                    系统将根据 <span className="font-bold text-gray-600">Part ID</span> 自动在库中检索对应的 <span className="font-bold text-gray-600">Model</span>。<br/>
-                    支持批量上传，自动识别同质化配置并进行模板归档。
-                  </p>
-                  <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" multiple />
+
+                  <div className="flex items-center gap-4 bg-amber-50 border border-amber-100 p-6 rounded-[2rem]">
+                     <AlertCircle size={24} className="text-amber-500 shrink-0" />
+                     <p className="text-[12px] text-amber-700 font-medium leading-relaxed">
+                        <b>厂商信息声明</b>：由于离线日志中缺少显式的品牌标记，系统将强制应用您所选的厂商前缀（如：{selectedManufacturer || '...'}）至后续步骤的所有硬件规格中，以确保资产库数据的品牌一致性。
+                     </p>
+                  </div>
                 </div>
               )}
             </div>
@@ -378,7 +487,7 @@ export const ImportModal: React.FC<{ isOpen: boolean; onClose: () => void; onApp
                       <Activity size={20} />
                     </div>
                     <div>
-                      <h4 className="text-lg font-black text-slate-800 tracking-tight">Part ID 聚合解析概览</h4>
+                      <h4 className="text-lg font-black text-slate-800 tracking-tight">Part ID 聚合解析概览 ({selectedManufacturer})</h4>
                       <p className="text-[12px] text-slate-400 font-medium italic mt-0.5">点击下方存在映射缺口的分类查看详细 Part ID 列表</p>
                     </div>
                   </div>
@@ -665,16 +774,22 @@ export const ImportModal: React.FC<{ isOpen: boolean; onClose: () => void; onApp
             <button onClick={onClose} className="px-12 py-4 text-xs font-bold text-gray-500 hover:bg-slate-200 rounded-2xl transition-all">取消导入</button>
             {step > 1 && (
               <button onClick={() => setStep(step - 1)} className="px-12 py-4 text-xs font-bold text-indigo-600 border border-indigo-200 rounded-2xl hover:bg-indigo-50 transition-all">
-                返回核对
+                返回修改
               </button>
             )}
             {step < 3 ? (
               <button 
-                onClick={() => setStep(step + 1)} 
-                disabled={step === 1 && !isParsing}
-                className={`flex items-center gap-3 px-16 py-4 text-xs font-bold text-white rounded-2xl shadow-2xl transition-all ${step === 1 && !isParsing ? 'bg-gray-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 active:scale-95 shadow-indigo-100'}`}
+                onClick={() => {
+                  if (step === 1 && !selectedManufacturer) {
+                    alert('请先选择服务器厂商');
+                    return;
+                  }
+                  setStep(step + 1);
+                }} 
+                disabled={step === 1 && (!hasUploaded || !selectedManufacturer)}
+                className={`flex items-center gap-3 px-16 py-4 text-xs font-bold text-white rounded-2xl shadow-2xl transition-all ${step === 1 && (!hasUploaded || !selectedManufacturer) ? 'bg-gray-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 active:scale-95 shadow-indigo-100'}`}
               >
-                下一步: 批量分配 <ChevronRight size={20} />
+                下一步: 规格核对 <ChevronRight size={20} />
               </button>
             ) : (
               <button 
